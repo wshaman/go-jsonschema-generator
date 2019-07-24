@@ -6,11 +6,13 @@ package jsonschema
 
 import (
 	"encoding/json"
+	"errors"
 	"reflect"
+	"strconv"
 	"strings"
 )
 
-const DEFAULT_SCHEMA = "http://json-schema.org/schema#"
+const DefaultSchema = "http://json-schema.org/schema#"
 
 type Document struct {
 	Schema string `json:"$schema,omitempty"`
@@ -27,7 +29,7 @@ func (d *Document) Read(variable interface{}) {
 
 func (d *Document) setDefaultSchema() {
 	if d.Schema == "" {
-		d.Schema = DEFAULT_SCHEMA
+		d.Schema = DefaultSchema
 	}
 }
 
@@ -38,12 +40,14 @@ func (d *Document) Marshal() ([]byte, error) {
 
 // String return the JSON encoding of the Document as a string
 func (d *Document) String() string {
-	json, _ := d.Marshal()
-	return string(json)
+	marshaled, _ := d.Marshal()
+	return string(marshaled)
 }
 
 type property struct {
 	Type                 string               `json:"type,omitempty"`
+	MinLength            *int                 `json:"minLength,omitempty"`
+	MaxLength            *int                 `json:"maxLength,omitempty"`
 	Format               string               `json:"format,omitempty"`
 	Items                *property            `json:"items,omitempty"`
 	Properties           map[string]*property `json:"properties,omitempty"`
@@ -125,6 +129,7 @@ func (p *property) readFromStruct(t reflect.Type) {
 
 		p.Properties[name] = &property{}
 		p.Properties[name].read(field.Type, opts)
+		p.Properties[name].applyOpts(opts)
 
 		if !opts.Contains("omitempty") {
 			p.Required = append(p.Required, name)
@@ -132,8 +137,36 @@ func (p *property) readFromStruct(t reflect.Type) {
 	}
 }
 
+func (p *property) setProp(key, val string) (err error) {
+	var iVal int
+	switch key {
+	case "minLength":
+		iVal, err = strconv.Atoi(val)
+		p.MinLength = &iVal
+	case "maxLength":
+		iVal, err = strconv.Atoi(val)
+		p.MaxLength = &iVal
+	default:
+		err = errors.New("unsupported property " + key)
+	}
+	return err
+}
+
+func (p *property) applyOpts(opts tagOptions) {
+	sOpts := string(opts)
+	for _, v := range strings.Split(string(sOpts), ",") {
+		k := strings.Split(v, ":")
+		key := k[0]
+		val := ""
+		if len(k) > 1 {
+			val = k[1]
+		}
+		_ = p.setProp(key, val)
+	}
+}
+
 var formatMapping = map[string][]string{
-	"time.Time": []string{"string", "date-time"},
+	"time.Time": {"string", "date-time"},
 }
 
 var kindMapping = map[reflect.Kind]string{

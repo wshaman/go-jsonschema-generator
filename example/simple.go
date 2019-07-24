@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/mcuadros/go-jsonschema-generator"
+	"github.com/wshaman/go-jsonschema-generator"
 )
 
 type EmbeddedType struct {
@@ -16,7 +16,7 @@ type Item struct {
 
 type ExampleBasic struct {
 	Foo bool   `json:"foo"`
-	Bar string `json:",omitempty"`
+	Bar string `json:",omitempty,minLength:1"`
 	Qux int8
 	Baz []string
 	EmbeddedType
